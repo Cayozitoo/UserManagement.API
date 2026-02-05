@@ -6,6 +6,8 @@ using System.Text;
 using System.Collections.Generic;
 using UserManagement.API.Infrastructure.Data;
 using Microsoft.OpenApi.Models;
+using UserManagement.API.Services;
+using UserManagement.API.Services.Interfaces;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -58,7 +60,7 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
 );
-
+builder.Services.AddScoped<IUserService, UserService>();
 // JWT Auth
 builder.Services.AddAuthentication(options =>
 {

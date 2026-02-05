@@ -1,11 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using UserManagement.API.Application.DTOs;
-using UserManagement.API.Domain.Entities;
-using UserManagement.API.Infrastructure.Data;
-using BCrypt.Net;
 using Microsoft.AspNetCore.Authorization;
-
+using Microsoft.AspNetCore.Mvc;
+using UserManagement.API.Application.DTOs;
+using UserManagement.API.Services.Interfaces;
 
 namespace UserManagement.API.Controllers
 {
@@ -13,80 +9,41 @@ namespace UserManagement.API.Controllers
     [Route("api/[controller]")]
     [Authorize]
     public class UsersController : ControllerBase
-    {   
-    private readonly AppDbContext _context;
-
-    public UsersController(AppDbContext context)
     {
-        _context = context;
-    }
+        private readonly IUserService _userService;
 
-    [HttpPost]
-    [AllowAnonymous] 
-    public async Task<IActionResult> Create(CreateUserDto dto)
-    {
-        var userExists = await _context.Users.AnyAsync(u => u.Email == dto.Email);
-        if (userExists)
-            return BadRequest("Email já cadastrado.");
-
-        var user = new User
+        public UsersController(IUserService userService)
         {
-            Id = Guid.NewGuid(),
-            FullName = dto.FullName,
-            Email = dto.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            CreatedAt = DateTime.UtcNow
-        };
+            _userService = userService;
+        }
 
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = user.Id }, new UserResponseDto
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> Create(CreateUserDto dto, CancellationToken ct)
         {
-            Id = user.Id,
-            FullName = user.FullName,
-            Email = user.Email,
-            Role = user.Role,
-            IsActive = user.IsActive,
-            CreatedAt = user.CreatedAt
-        });
-    }
+            try
+            {
+                var created = await _userService.CreateAsync(dto, ct);
+                return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            }
+            catch (InvalidOperationException ex) // email duplicado (por enquanto)
+            {
+                return Conflict(ex.Message);
+            }
+        }
 
-   [HttpGet]
-public async Task<IActionResult> GetAll()
-{
-    var users = await _context.Users
-        .Select(u => new UserResponseDto
+        [HttpGet]
+        public async Task<IActionResult> GetAll(CancellationToken ct)
         {
-            Id = u.Id,
-            FullName = u.FullName,
-            Email = u.Email,
-            Role = u.Role,
-            IsActive = u.IsActive,
-            CreatedAt = u.CreatedAt
-        })
-        .ToListAsync();
+            var users = await _userService.GetAllAsync(ct);
+            return Ok(users);
+        }
 
-    return Ok(users);
-}
-
-[HttpGet("{id}")]
-public async Task<IActionResult> GetById(Guid id)
-{
-    var user = await _context.Users.FindAsync(id);
-    if (user == null)
-        return NotFound();
-
-    return Ok(new UserResponseDto
-    {
-        Id = user.Id,
-        FullName = user.FullName,
-        Email = user.Email,
-        Role = user.Role,
-        IsActive = user.IsActive,
-        CreatedAt = user.CreatedAt
-    });
-    }   
-
+        [HttpGet("{id:guid}")]
+        public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
+        {
+            var user = await _userService.GetByIdAsync(id, ct);
+            return user is null ? NotFound() : Ok(user);
+        }
     }
 }
