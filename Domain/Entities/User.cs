@@ -10,10 +10,10 @@ namespace UserManagement.API.Domain.Entities
 
         public string Email { get; set; } = string.Empty;
 
-        // 🔐 Nunca armazenar senha em texto puro
+       
         public string PasswordHash { get; set; } = string.Empty;
 
-        // Ex: Admin, User
+        
         public string Role { get; set; } = "User";
 
         public bool IsActive { get; set; } = true;
